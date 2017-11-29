@@ -334,7 +334,10 @@ ${OBJDIR}/Optimize.o : ${SRCDIR}/Optimize.f90 ${OBJDIR}/MyLinearAlgebra.o ${OBJD
 ${OBJDIR}/FiniteDifference.o : ${SRCDIR}/FiniteDifference.f90 ${COMMONDEP}
 
 # Error and warning procedures
-${OBJDIR}/MyLinearAlgebra.o : ${SRCDIR}/MyLinearAlgebra.f90 Makefile
+${OBJDIR}/MyLinearAlgebra.o : ${SRCDIR}/MyLinearAlgebra.f90 ${OBJDIR}/MyError.o  Makefile
+
+# potential energy surface
+${OBJDIR}/PES.o : ${SRCDIR}/PES.f90 Makefile
 
 # Error and warning procedures
 ${OBJDIR}/MyError.o : ${SRCDIR}/MyError.f90 Makefile
