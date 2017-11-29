@@ -118,6 +118,10 @@ MODULE Optimize
 
 !**************************************************************************************
 !>  Minimize potential with a steepest descent algorithm.
+!>  the step of the gradient descent is chosen with an adaptive algorithm
+!>  which is based on the Two-Point Step Size formula of J. BARZILAI and J.M. BORWEIN
+!>  see paper IMA Journal of Numerical Analysis, Volume 8, Issue 1, 1 January 1988,
+!>  Pages 141–148, https://doi.org/10.1093/imanum/8.1.141
 !>
 !> @param StartX        Input vector with the starting point of the minimization
 !> @param NMaxIter      Max number of iterations
