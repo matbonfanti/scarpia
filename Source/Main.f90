@@ -15,6 +15,7 @@ PROGRAM scarpia
 #include "preprocessoptions.cpp"
    USE FiniteDifference
    USE Optimize
+   USE PES
 
    IMPLICIT NONE
 
@@ -31,14 +32,16 @@ PROGRAM scarpia
    ! Number of coordinates of the potential
    INTEGER :: NCoord = 1
 
-   ! Guess geometry of the minimum
-   REAL, DIMENSION(:), ALLOCATABLE :: XGuess
    ! Optimized geometry of the minimum
    REAL, DIMENSION(:), ALLOCATABLE :: XOpt
+   ! Eigenvalues of the hamiltonian
+   REAL, DIMENSION(:), ALLOCATABLE :: EigenValues
 
    ! Finite difference step
    REAL, PARAMETER :: DeltaFiniteDiff = 0.01
 
+   ! Energy
+   REAL :: Pot
 
    !*************************************************************
    !   INITIAL MESSAGES AND MISCELLANOUS STUFF
@@ -59,50 +62,49 @@ PROGRAM scarpia
    __INIT_LOG_FILE
 #endif
 
-   !*************************************************************
-   !         COMMAND LINE ARGUMENT
-   !*************************************************************
-
-   ! Check and read from command line the input file name
-   NArgs = COMMAND_ARGUMENT_COUNT()
-   IF (NArgs<1) THEN
-      Help = .TRUE.
-   ELSE
-      CALL GET_COMMAND_ARGUMENT( 1, InputFileName )
-      IF ( trim(InputFileName) == "help" ) Help = .TRUE.
-   ENDIF
-   IF (Help) THEN ! Call help
-      PRINT*, ' Launch this program as:'
-      PRINT*, ' % scarpia "InputFileName" '
-      STOP
-   ENDIF
+!    !*************************************************************
+!    !         COMMAND LINE ARGUMENT
+!    !*************************************************************
+!
+!    ! Check and read from command line the input file name
+!    NArgs = COMMAND_ARGUMENT_COUNT()
+!    IF (NArgs<1) THEN
+!       Help = .TRUE.
+!    ELSE
+!       CALL GET_COMMAND_ARGUMENT( 1, InputFileName )
+!       IF ( trim(InputFileName) == "help" ) Help = .TRUE.
+!    ENDIF
+!    IF (Help) THEN ! Call help
+!       PRINT*, ' Launch this program as:'
+!       PRINT*, ' % scarpia "InputFileName" '
+!       STOP
+!    ENDIF
 
    !*************************************************************
    !                 INPUT AND ARRAY ALLOCATION
    !*************************************************************
 
-   ! HERE INPUT DATA
-
-   ! Allocate X vectors
-   ALLOCATE( XGuess(NCoord), XOpt(NCoord) )
-   ! Define guess geometry
-   XGuess = 0.0
+   ! Input data
+   call read_inputfiles()
+   ! allocate memory
+   ALLOCATE( XOpt(ndofs), EigenValues(syssize) )
 
    !*************************************************************
    !                 OPTIMIZATION
    !*************************************************************
 
-   XOpt = SteepLocator( GetPotAndForces, XGuess, 1000, 1.E-5, DeltaFiniteDiff )
+   XOpt = SteepLocator( GetPotAndForces, paramguess, 1000, 1.E-5, DeltaFiniteDiff )
 
    !*************************************************************
    !                 OUTPUT AND DEALLOCATION
    !*************************************************************
 
    ! Print result
-
+   Pot = GetPotential( XOpt )
+   CALL write_outputfiles(XOpt, EigenValues )
 
    ! Deallocate X vectors
-   DEALLOCATE( XGuess, XOpt )
+   DEALLOCATE( XOpt )
 
 
    CONTAINS
@@ -114,10 +116,12 @@ PROGRAM scarpia
 
       REAL FUNCTION GetPotential( X )
          REAL, DIMENSION(:), INTENT(IN)  :: X
+         REAL, DIMENSION(syssize,syssize) :: Hamiltonian
 
-         ! DEFINE HERE THE POTENTIAL AS A FUNCTION OF THE COORDINATES X
-
-         GetPotential = 0.0
+         ! construct the hamiltonian matrix
+         call build_matrix( X, Hamiltonian )
+         ! diagonalize the hamiltonian matrix and return the first eigenvalue
+         call diagonalize_matrix( Hamiltonian, EigenValues, GetPotential )
 
       END FUNCTION GetPotential
 
@@ -132,6 +136,7 @@ PROGRAM scarpia
 
          GetPotAndForces =  GetPotential( X )
          Force = GetGradient( X, GetPotential, DeltaFiniteDiff )
+         Force = - Force
 
       END FUNCTION GetPotAndForces
 
