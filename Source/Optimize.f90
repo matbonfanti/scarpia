@@ -157,8 +157,8 @@ MODULE Optimize
       CurrentX = StartX
 
 #if defined(LOG_FILE)
-      WRITE(__LOG_UNIT,"(A12,3A20)") "SteepLocator | N Iteration",  "Potential", "Gradient Norm", "Lambda"
-      WRITE(__LOG_UNIT,*)           "SteepLocator | ---------------------------------------------------------------------------"
+      WRITE(__LOG_UNIT,"(A,3A20)") " SteepLocator | N Iteration",  "Potential", "Gradient Norm", "Lambda"
+      WRITE(__LOG_UNIT,"(A)")      " SteepLocator | ---------------------------------------------------------------------------"
 #endif
 
       ! Compute Hessian and forces at current position
@@ -174,6 +174,7 @@ MODULE Optimize
 
       Iterations: DO NIter = 1, NMaxIter
 
+         Lambda = 100.0
          DO
             ! Move along gradient
             CurrentX(:) = OldX(:) + Lambda * OldForces(:)
@@ -186,13 +187,14 @@ MODULE Optimize
                Lambda = Lambda * 0.7
             END IF
             IF ( Lambda < 1.E-8 ) EXIT
+
          END DO
 
          ! Compute norm of the gradient
          GradNorm  = SQRT(TheOneWithVectorDotVector(Forces, Forces))
 #if defined(LOG_FILE)
          ! Print info to log file
-         IF ( MOD(NIter-1,NMaxIter/20) == 0 ) WRITE(__LOG_UNIT,"(A,I12,3E20.6)") "SteepLocator | ", NIter, V, GradNorm, Lambda
+         IF ( MOD(NIter-1,1) == 0 ) WRITE(__LOG_UNIT,"(A,I12,3E20.6)") " SteepLocator | ", NIter, V, GradNorm, Lambda
 #endif
 
          ! Check convergence criteria
@@ -200,10 +202,19 @@ MODULE Optimize
             EXIT Iterations
          END IF
 
+         ! We now have new and old derivatives ( Forces, OldForces ) and new and old coordinates ( CurrentX, OldX ), compute lambda
+         Lambda = ComputeLambda( CurrentX, OldX, Forces, OldForces )
+         IF ( Lambda < 0.0 ) Lambda = 100.0
+
+         ! Store the previous coordinates and the previous derivatives
+         OldX = CurrentX
+         OldForces = Forces
+         OldV = V
+
       END DO Iterations
 
 #if defined(LOG_FILE)
-      WRITE(__LOG_UNIT,"(A,I12,E20.6,E20.6)") "SteepLocator | ",NIter, GradNorm
+      WRITE(__LOG_UNIT,"(A,I12,3E20.6)") " SteepLocator | ", NIter, V, GradNorm, Lambda
 #endif
 
       ! Check max number of iterations
@@ -221,6 +232,26 @@ MODULE Optimize
 #endif
 
    END FUNCTION SteepLocator
+
+   REAL FUNCTION ComputeLambda( NewXi, OldXi, NewForces, OldForces  )
+      IMPLICIT NONE
+      REAL, DIMENSION(:), INTENT(IN) ::  NewXi, OldXi, NewForces, OldForces
+      REAL :: FTimesX, FTimesF
+      REAL :: DeltaX, DeltaF
+      INTEGER :: j
+
+      FTimesX = 0.0
+      FTimesF = 0.0
+
+      DO j = 1, SIZE(NewXi)
+         DeltaX = NewXi(j) - OldXi(j)
+         DeltaF = NewForces(j) - OldForces(j)
+         FTimesX = FTimesX + DeltaF*DeltaX
+         FTimesF = FTimesF + DeltaF*DeltaF
+      END DO
+      ComputeLambda = FTimesX / FTimesF
+
+   END FUNCTION ComputeLambda
 
 !===============================================================================================================================
 
